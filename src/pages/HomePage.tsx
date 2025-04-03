@@ -35,8 +35,8 @@ const HomePage = () => {
 		};
 
 		const player2: PlayerCreate = {
-			nickname: "Player 2",
-			type: player2Type as PlayerType,
+			nickname: player2Type === "me" ? nickname : "Player 2",
+			type: player2Type === "me" ? "human" : (player2Type as PlayerType),
 		};
 
 		const p1Id = await createPlayer(player1);
@@ -98,13 +98,11 @@ const HomePage = () => {
 						<FormControl fullWidth>
 							<InputLabel>Player 2</InputLabel>
 							<Select value={player2Type} label="Player 2" onChange={(e) => setPlayer2Type(e.target.value)}>
-								{playerOptions
-									.filter((opt) => opt.value !== "me")
-									.map((opt) => (
-										<MenuItem key={opt.value} value={opt.value}>
-											{opt.label}
-										</MenuItem>
-									))}
+								{playerOptions.map((opt) => (
+									<MenuItem key={opt.value} value={opt.value}>
+										{opt.label}
+									</MenuItem>
+								))}
 							</Select>
 						</FormControl>
 					</Box>
