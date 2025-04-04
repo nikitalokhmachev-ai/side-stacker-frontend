@@ -171,6 +171,13 @@ const GamePage = () => {
 	const canMove = game.status === "in_progress" && isMyTurn;
 	const isOnlineGame = game.player_1.type === "human" && game.player_2.type === "human" && game.player_1.id !== game.player_2.id;
 
+	const isGameOver = game.status !== "in_progress";
+
+	const winnerName = game.status === "x_won" ? game.player_1.nickname : game.status === "o_won" ? game.player_2.nickname : null;
+	const opponentNickname = mySymbol === "x" ? game.player_2.nickname : game.player_1.nickname;
+
+	const localPlayerNickname = mySymbol === "x" ? game.player_1.nickname : game.player_2.nickname;
+
 	return (
 		<Box
 			sx={{
@@ -194,30 +201,82 @@ const GamePage = () => {
 					alignItems: "center",
 				}}
 			>
-				<Typography variant="h4" gutterBottom>
-					Game ID: {game.id}
-				</Typography>
-				<Typography variant="h6" gutterBottom>
-					Status: {game.status} | Turn: {game.current_turn}
-				</Typography>
+				<Box
+					sx={{
+						display: "flex",
+						justifyContent: "space-between",
+						alignItems: "center",
+						width: "100%",
+						p: 2,
+						mb: 2,
+						backgroundColor: "#fefefe",
+						borderRadius: "8px",
+						border: "1px solid #ddd",
+						boxShadow: 2,
+					}}
+				>
+					{/* You */}
+					<Box sx={{ textAlign: "center" }}>
+						<Typography variant="body1" sx={{ fontWeight: "bold", mb: 0.5 }}>
+							You
+						</Typography>
+						<Typography variant="h6" color="primary">
+							{getDisplayName(mySymbol === "x" ? game.player_1.type : game.player_2.type, localPlayerNickname)}
+						</Typography>
+						<Typography variant="h5" sx={{ mt: 0.5 }}>
+							{mySymbol === "x" ? "🔵" : "🔴"}
+						</Typography>
+					</Box>
 
-				{isOnlineGame && (
-					<Typography variant="h6" sx={{ mb: 2 }}>
+					{/* VS Divider */}
+					<Typography variant="h6" sx={{ px: 2 }}>
+						vs
+					</Typography>
+
+					{/* Opponent */}
+					<Box sx={{ textAlign: "center" }}>
+						<Typography variant="body1" sx={{ fontWeight: "bold", mb: 0.5 }}>
+							Opponent
+						</Typography>
+						<Typography variant="h6" color="red">
+							{getDisplayName(mySymbol === "x" ? game.player_2.type : game.player_1.type, opponentNickname)}
+						</Typography>
+						<Typography variant="h5" sx={{ mt: 0.5 }}>
+							{mySymbol === "x" ? "🔴" : "🔵"}
+						</Typography>
+					</Box>
+				</Box>
+
+				{isOnlineGame && !isGameOver && (
+					<Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
 						{isMyTurn ? "Your turn!" : "Waiting for opponent..."}
 					</Typography>
 				)}
 
-				<Paper sx={{ width: "100%", p: 2, mb: 2 }}>
-					<Typography variant="body1">X = {getDisplayName(game.player_1.type, game.player_1.nickname)}</Typography>
-					<Typography variant="body1">O = {getDisplayName(game.player_2.type, game.player_2.nickname)}</Typography>
-				</Paper>
-
 				<Box>
 					{game.board.map((row, rowIndex) => (
 						<Box key={rowIndex} display="flex" alignItems="center" mb={1}>
-							<Button size="small" variant="outlined" onClick={() => handleMove(rowIndex, "L")} disabled={!canMove || botProcessing}>
-								→
+							<Button
+								variant="contained"
+								color="primary"
+								onClick={() => handleMove(rowIndex, "L")}
+								disabled={!canMove || botProcessing}
+								sx={{
+									minWidth: 40,
+									height: 40,
+									mr: 1,
+									fontSize: 20,
+									fontWeight: "bold",
+									backgroundColor: "#1976d2",
+									":disabled": {
+										backgroundColor: "#ccc",
+										color: "#888",
+									},
+								}}
+							>
+								➡️
 							</Button>
+
 							<Box display="flex">
 								{row.map((cell, colIndex) => (
 									<Box
@@ -239,12 +298,35 @@ const GamePage = () => {
 									</Box>
 								))}
 							</Box>
-							<Button size="small" variant="outlined" onClick={() => handleMove(rowIndex, "R")} disabled={!canMove || botProcessing}>
-								←
+							<Button
+								variant="contained"
+								color="secondary"
+								onClick={() => handleMove(rowIndex, "R")}
+								disabled={!canMove || botProcessing}
+								sx={{
+									minWidth: 40,
+									height: 40,
+									ml: 1,
+									fontSize: 20,
+									fontWeight: "bold",
+									backgroundColor: "#d32f2f",
+									":disabled": {
+										backgroundColor: "#ccc",
+										color: "#888",
+									},
+								}}
+							>
+								⬅️
 							</Button>
 						</Box>
 					))}
 				</Box>
+
+				{isGameOver && (
+					<Typography variant="h5" sx={{ mt: 2, fontWeight: "bold" }} color="primary">
+						{winnerName ? `${winnerName} wins! 🎉` : "It's a draw!"}
+					</Typography>
+				)}
 
 				<Button onClick={handleBack} variant="contained" sx={{ mt: 4 }}>
 					Back
