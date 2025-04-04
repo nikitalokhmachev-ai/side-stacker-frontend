@@ -7,4 +7,5 @@ export default defineConfig({
 	server: {
 		allowedHosts: ["terminology-resort-basename-contents.trycloudflare.com"],
 	},
+	base: "/side-stacker-frontend",
 });
