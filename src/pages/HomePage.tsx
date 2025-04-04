@@ -1,9 +1,21 @@
-import React, { useEffect, useState } from "react";
-import { Box, Button, Typography, Paper, MenuItem, Select, FormControl, InputLabel, IconButton, TextField } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
+import { useState } from "react";
+import {
+	Box,
+	Button,
+	Typography,
+	MenuItem,
+	Select,
+	FormControl,
+	InputLabel,
+	TextField,
+	Dialog,
+	DialogTitle,
+	DialogContent,
+	DialogActions,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { getAllGames, createGame, createPlayer, deleteGame } from "../api/gameApi";
-import { GameState, PlayerCreate, PlayerType } from "../types/game";
+import { createGame, createPlayer } from "../api/gameApi";
+import { PlayerCreate, PlayerType } from "../types/game";
 
 const playerOptions = [
 	{ label: "Me", value: "me" },
@@ -13,20 +25,12 @@ const playerOptions = [
 ];
 
 const HomePage = () => {
-	const [games, setGames] = useState<GameState[]>([]);
 	const [player1Type, setPlayer1Type] = useState("me");
 	const [player2Type, setPlayer2Type] = useState("easy_bot");
 	const [nickname, setNickname] = useState("Player 1");
 	const navigate = useNavigate();
-
-	const fetchGames = async () => {
-		const allGames = await getAllGames();
-		setGames(allGames);
-	};
-
-	useEffect(() => {
-		fetchGames();
-	}, []);
+	const [onlineModalOpen, setOnlineModalOpen] = useState(false);
+	const [waitingSocket, setWaitingSocket] = useState<WebSocket | null>(null);
 
 	const handleStartGame = async () => {
 		const player1: PlayerCreate = {
@@ -43,12 +47,44 @@ const HomePage = () => {
 		const p2Id = await createPlayer(player2);
 
 		const newGame = await createGame(p1Id, p2Id);
-		if (newGame) navigate(`/game/${newGame.id}`);
+		if (newGame) navigate(`/game/${newGame.id}`, { state: { playerId: p1Id } });
 	};
 
-	const handleDeleteGame = async (id: string) => {
-		await deleteGame(id);
-		fetchGames();
+	const handleOnlineGame = async () => {
+		const newPlayer: PlayerCreate = {
+			nickname,
+			type: "human",
+		};
+
+		const playerId = await createPlayer(newPlayer);
+
+		const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/online-game`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ player_id: playerId }),
+		});
+
+		const data = await res.json();
+
+		if (data.waiting) {
+			setOnlineModalOpen(true);
+
+			const socket = new WebSocket(`${import.meta.env.VITE_WS_BASE_URL}/waiting/${playerId}`);
+			socket.onmessage = (event) => {
+				const game = JSON.parse(event.data);
+				socket.close();
+				setOnlineModalOpen(false);
+				navigate(`/game/${game.id}`, { state: { playerId } });
+			};
+
+			socket.onerror = () => {
+				console.warn("WebSocket error during online waiting");
+			};
+
+			setWaitingSocket(socket);
+		} else {
+			navigate(`/game/${data.game.id}`, { state: { playerId } });
+		}
 	};
 
 	return (
@@ -112,41 +148,31 @@ const HomePage = () => {
 					<Button variant="contained" onClick={handleStartGame}>
 						Start Game
 					</Button>
-				</Box>
-
-				<Typography variant="h5" gutterBottom align="center">
-					Existing Games
-				</Typography>
-
-				<Box width="100%">
-					{games.map((game) => (
-						<Paper
-							key={game.id}
-							sx={{
-								p: 2,
-								mt: 2,
-								display: "flex",
-								justifyContent: "space-between",
-								alignItems: "center",
-							}}
-						>
-							<Box>
-								<Typography>ID: {game.id}</Typography>
-								<Typography>Status: {game.status}</Typography>
-								<Typography>Turn: {game.current_turn}</Typography>
-							</Box>
-							<Box>
-								<Button variant="outlined" onClick={() => navigate(`/game/${game.id}`)}>
-									Play
-								</Button>
-								<IconButton color="error" onClick={() => handleDeleteGame(game.id)}>
-									<DeleteIcon />
-								</IconButton>
-							</Box>
-						</Paper>
-					))}
+					<Button variant="contained" color="success" onClick={handleOnlineGame}>
+						Online Game
+					</Button>
 				</Box>
 			</Box>
+			<Dialog open={onlineModalOpen}>
+				<DialogTitle>Please Wait...</DialogTitle>
+				<DialogContent>
+					<Typography>Waiting for another player to join your game.</Typography>
+				</DialogContent>
+				<DialogActions>
+					<Button
+						onClick={() => {
+							if (waitingSocket) {
+								waitingSocket.close();
+								setWaitingSocket(null);
+							}
+							setOnlineModalOpen(false);
+						}}
+						color="error"
+					>
+						Disconnect
+					</Button>
+				</DialogActions>
+			</Dialog>
 		</Box>
 	);
 };

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getGame, makeMove, makeBotMove, deleteGame } from "../api/gameApi";
 import { GameState } from "../types/game";
-import { Box, Typography, Button, CircularProgress, Paper } from "@mui/material";
+import { Box, Typography, Button, CircularProgress, Paper, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 
 const GamePage = () => {
 	const { id } = useParams<{ id: string }>();
@@ -10,8 +10,24 @@ const GamePage = () => {
 	const [game, setGame] = useState<GameState | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [botProcessing, setBotProcessing] = useState(false);
+	const socketRef = useRef<WebSocket | null>(null);
+
+	const clientId = useRef(Math.random().toString(36).slice(2));
+	const isBotOwner = useRef(false);
+	const gameKey = useMemo(() => `bot_owner_${id}`, [id]);
 
 	const isBot = (type: string) => type !== "human";
+
+	const location = useLocation();
+	const localPlayerId = location.state?.playerId;
+	const [opponentLeft, setOpponentLeft] = useState(false);
+
+	const getPlayerSymbol = () => {
+		if (!game || !localPlayerId) return null;
+		if (game.player_1.id === localPlayerId) return "x";
+		if (game.player_2.id === localPlayerId) return "o";
+		return null;
+	};
 
 	const getDisplayName = (type: string, nickname: string) => {
 		if (type === "easy_bot") return "Easy Bot";
@@ -21,6 +37,32 @@ const GamePage = () => {
 	};
 
 	const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+	useEffect(() => {
+		if (!id) return;
+		const currentOwner = localStorage.getItem(gameKey);
+		if (!currentOwner) {
+			localStorage.setItem(gameKey, clientId.current);
+			isBotOwner.current = true;
+		} else {
+			isBotOwner.current = currentOwner === clientId.current;
+		}
+
+		// Cleanup if this tab closes or navigates away
+		const handleUnload = () => {
+			if (isBotOwner.current) {
+				localStorage.removeItem(gameKey);
+			}
+		};
+
+		window.addEventListener("beforeunload", handleUnload);
+		return () => {
+			if (isBotOwner.current) {
+				localStorage.removeItem(gameKey);
+			}
+			window.removeEventListener("beforeunload", handleUnload);
+		};
+	}, [gameKey]);
 
 	useEffect(() => {
 		const fetchGame = async () => {
@@ -37,6 +79,35 @@ const GamePage = () => {
 	}, [id]);
 
 	useEffect(() => {
+		if (!id) return;
+
+		const socket = new WebSocket(`${import.meta.env.VITE_WS_BASE_URL}/games/${id}`);
+
+		socketRef.current = socket;
+
+		socket.onmessage = (event) => {
+			const data: GameState = JSON.parse(event.data);
+			if (data.status === "deleted") {
+				setOpponentLeft(true);
+				return;
+			}
+			setGame(data);
+		};
+
+		socket.onerror = () => {
+			console.warn("WebSocket error");
+		};
+
+		socket.onclose = () => {
+			console.log("WebSocket closed");
+		};
+
+		return () => {
+			socket.close();
+		};
+	}, [id]);
+
+	useEffect(() => {
 		const runBotTurn = async () => {
 			if (!game || game.status !== "in_progress" || botProcessing) return;
 
@@ -46,10 +117,9 @@ const GamePage = () => {
 			const isAIVsAI = isBot(game.player_1.type) && isBot(game.player_2.type);
 			const isCurrentBot = isBot(currentPlayer.type);
 
-			if (isCurrentBot) {
+			if (isCurrentBot && isBotOwner.current) {
 				setBotProcessing(true);
 
-				// Wait if it's AI vs AI, or just current turn is bot
 				if (isAIVsAI || !isBot(nextPlayer.type)) {
 					await delay(2000);
 				}
@@ -72,17 +142,17 @@ const GamePage = () => {
 		if (!game || game.status !== "in_progress") return;
 		const currentPlayer = game.current_turn === "x" ? game.player_1 : game.player_2;
 		if (!isBot(currentPlayer.type)) {
-			const updated = await makeMove(game.id, {
+			await makeMove(game.id, {
 				player: game.current_turn,
 				row,
 				side,
 			});
-			setGame(updated);
+			// No setGame here — update will come from WebSocket
 		}
 	};
 
 	const handleBack = async () => {
-		if (game && game.status !== "in_progress") {
+		if (game) {
 			await deleteGame(game.id);
 		}
 		navigate("/");
@@ -95,6 +165,11 @@ const GamePage = () => {
 			</Box>
 		);
 	}
+
+	const mySymbol = getPlayerSymbol();
+	const isMyTurn = mySymbol === game.current_turn;
+	const canMove = game.status === "in_progress" && isMyTurn;
+	const isOnlineGame = game.player_1.type === "human" && game.player_2.type === "human" && game.player_1.id !== game.player_2.id;
 
 	return (
 		<Box
@@ -126,6 +201,12 @@ const GamePage = () => {
 					Status: {game.status} | Turn: {game.current_turn}
 				</Typography>
 
+				{isOnlineGame && (
+					<Typography variant="h6" sx={{ mb: 2 }}>
+						{isMyTurn ? "Your turn!" : "Waiting for opponent..."}
+					</Typography>
+				)}
+
 				<Paper sx={{ width: "100%", p: 2, mb: 2 }}>
 					<Typography variant="body1">X = {getDisplayName(game.player_1.type, game.player_1.nickname)}</Typography>
 					<Typography variant="body1">O = {getDisplayName(game.player_2.type, game.player_2.nickname)}</Typography>
@@ -134,8 +215,8 @@ const GamePage = () => {
 				<Box>
 					{game.board.map((row, rowIndex) => (
 						<Box key={rowIndex} display="flex" alignItems="center" mb={1}>
-							<Button size="small" variant="outlined" onClick={() => handleMove(rowIndex, "L")} disabled={game.status !== "in_progress" || botProcessing}>
-								←
+							<Button size="small" variant="outlined" onClick={() => handleMove(rowIndex, "L")} disabled={!canMove || botProcessing}>
+								→
 							</Button>
 							<Box display="flex">
 								{row.map((cell, colIndex) => (
@@ -158,8 +239,8 @@ const GamePage = () => {
 									</Box>
 								))}
 							</Box>
-							<Button size="small" variant="outlined" onClick={() => handleMove(rowIndex, "R")} disabled={game.status !== "in_progress" || botProcessing}>
-								→
+							<Button size="small" variant="outlined" onClick={() => handleMove(rowIndex, "R")} disabled={!canMove || botProcessing}>
+								←
 							</Button>
 						</Box>
 					))}
@@ -168,6 +249,17 @@ const GamePage = () => {
 				<Button onClick={handleBack} variant="contained" sx={{ mt: 4 }}>
 					Back
 				</Button>
+				<Dialog open={opponentLeft}>
+					<DialogTitle>Opponent Left</DialogTitle>
+					<DialogContent>
+						<Typography>Your opponent has exited the game.</Typography>
+					</DialogContent>
+					<DialogActions>
+						<Button variant="contained" onClick={() => navigate("/")}>
+							Back
+						</Button>
+					</DialogActions>
+				</Dialog>
 			</Box>
 		</Box>
 	);
