@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
 	plugins: [react()],
 	server: {
-		allowedHosts: ["terminology-resort-basename-contents.trycloudflare.com"],
+		allowedHosts: ["nikitalokhmachev-ai.github.io"],
 	},
 	base: "/side-stacker-frontend",
 });
