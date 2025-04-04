@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getGame, makeMove, makeBotMove, deleteGame } from "../api/gameApi";
 import { GameState } from "../types/game";
-import { Box, Typography, Button, CircularProgress, Paper, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { Box, Typography, Button, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 
 const GamePage = () => {
 	const { id } = useParams<{ id: string }>();
