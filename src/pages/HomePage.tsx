@@ -134,11 +134,13 @@ const HomePage = () => {
 						<FormControl fullWidth>
 							<InputLabel>Player 2</InputLabel>
 							<Select value={player2Type} label="Player 2" onChange={(e) => setPlayer2Type(e.target.value)}>
-								{playerOptions.map((opt) => (
-									<MenuItem key={opt.value} value={opt.value}>
-										{opt.label}
-									</MenuItem>
-								))}
+								{playerOptions
+									.filter((opt) => opt.value !== "me")
+									.map((opt) => (
+										<MenuItem key={opt.value} value={opt.value}>
+											{opt.label}
+										</MenuItem>
+									))}
 							</Select>
 						</FormControl>
 					</Box>
