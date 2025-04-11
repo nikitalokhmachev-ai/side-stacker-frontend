@@ -168,12 +168,14 @@ const GamePage = () => {
 
 	const mySymbol = getPlayerSymbol();
 	const isMyTurn = mySymbol === game.current_turn;
-	const canMove = game.status === "in_progress" && isMyTurn;
+
+	const isOldGame = game.status !== "in_progress";
+	const canMove = !isOldGame && isMyTurn;
 	const isOnlineGame = game.player_1.type === "human" && game.player_2.type === "human" && game.player_1.id !== game.player_2.id;
 
 	const isGameOver = game.status !== "in_progress";
 
-	const winnerName = game.status === "x_won" ? game.player_1.nickname : game.status === "o_won" ? game.player_2.nickname : null;
+	// const winnerName = game.status === "x_won" ? game.player_1.nickname : game.status === "o_won" ? game.player_2.nickname : null;
 	const opponentNickname = mySymbol === "x" ? game.player_2.nickname : game.player_1.nickname;
 
 	const localPlayerNickname = mySymbol === "x" ? game.player_1.nickname : game.player_2.nickname;
@@ -324,10 +326,12 @@ const GamePage = () => {
 
 				{isGameOver && (
 					<Typography variant="h5" sx={{ mt: 2, fontWeight: "bold" }} color="primary">
-						{winnerName ? `${winnerName} wins! 🎉` : "It's a draw!"}
+						{game.status === "x_won" && `${game.player_1.nickname} wins! 🎉`}
+						{game.status === "o_won" && `${game.player_2.nickname} wins! 🎉`}
+						{game.status === "draw" && "It's a draw!"}
+						{game.status === "abandoned" && "Game was abandoned."}
 					</Typography>
 				)}
-
 				<Button onClick={handleBack} variant="contained" sx={{ mt: 4 }}>
 					Back
 				</Button>
