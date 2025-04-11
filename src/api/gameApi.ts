@@ -1,5 +1,5 @@
 import axios from "axios";
-import { GameState, PlayerCreate } from "../types/game";
+import { GameState, PlayerCreate, PlayerInfo } from "../types/game";
 
 const API = axios.create({
 	baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -7,6 +7,16 @@ const API = axios.create({
 
 export const getAllGames = async (): Promise<GameState[]> => {
 	const res = await API.get("/games");
+	return res.data;
+};
+
+export const getPlayer = async (playerId: string): Promise<PlayerInfo> => {
+	const res = await API.get(`/players/${playerId}`);
+	return res.data;
+};
+
+export const getGamesByPlayer = async (playerId: string): Promise<GameState[]> => {
+	const res = await API.get(`/players/${playerId}/games`);
 	return res.data;
 };
 
