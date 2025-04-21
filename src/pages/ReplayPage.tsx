@@ -6,10 +6,10 @@ import { Box, Typography, Button, CircularProgress } from "@mui/material";
 
 const ReplayPage = () => {
 	const { id } = useParams<{ id: string }>();
-	const navigate = useNavigate();
 	const [game, setGame] = useState<GameState | null>(null);
+	const [board, setBoard] = useState<string[][]>([]);
 	const [loading, setLoading] = useState(true);
-
+	const navigate = useNavigate();
 	useEffect(() => {
 		const fetchAndReplay = async () => {
 			if (!id) return;
@@ -19,10 +19,8 @@ const ReplayPage = () => {
 
 				const emptyBoard = Array.from({ length: data.board.length }, () => Array.from({ length: data.board[0].length }, () => "_"));
 
-				setGame({
-					...data,
-					board: emptyBoard,
-				});
+				setGame(data);
+				setBoard(emptyBoard);
 
 				await delay(1000);
 				await playReplay(data.moves);
@@ -39,12 +37,10 @@ const ReplayPage = () => {
 	const playReplay = async (moves: { player: string; row: number; side: "L" | "R" }[]) => {
 		for (let move of moves) {
 			await delay(1000);
-			setGame((prev) => {
-				if (!prev) return prev;
-				const updatedBoard = JSON.parse(JSON.stringify(prev.board));
-				applyMoveLocally(updatedBoard, move.row, move.side, move.player);
-				const nextTurn = move.player === "x" ? "o" : "x";
-				return { ...prev, board: updatedBoard, current_turn: nextTurn };
+			setBoard((prevBoard) => {
+				const updated = JSON.parse(JSON.stringify(prevBoard));
+				applyMoveLocally(updated, move.row, move.side, move.player);
+				return updated;
 			});
 		}
 	};
@@ -111,7 +107,7 @@ const ReplayPage = () => {
 				</Typography>
 
 				<Box>
-					{game.board.map((row, rowIndex) => (
+					{board.map((row, rowIndex) => (
 						<Box key={rowIndex} display="flex" alignItems="center" mb={1}>
 							{row.map((cell, colIndex) => (
 								<Box
