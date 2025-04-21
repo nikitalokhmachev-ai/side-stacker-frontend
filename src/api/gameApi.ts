@@ -51,3 +51,8 @@ export const makeBotMove = async (gameId: string, difficulty: string): Promise<G
 	const res = await API.post(`/games/${gameId}/bot_move/${difficulty}`);
 	return res.data;
 };
+
+export const getReplay = async (gameId: string): Promise<string[][][]> => {
+	const res = await API.get(`/games/${gameId}/replay`);
+	return res.data;
+};

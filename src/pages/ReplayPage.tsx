@@ -1,81 +1,55 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getGame } from "../api/gameApi";
-import { GameState } from "../types/game";
+import { getReplay, getGame } from "../api/gameApi";
 import { Box, Typography, Button, CircularProgress } from "@mui/material";
 
 const ReplayPage = () => {
 	const { id } = useParams<{ id: string }>();
-	const [game, setGame] = useState<GameState | null>(null);
-	const [board, setBoard] = useState<string[][]>([]);
-	const [loading, setLoading] = useState(true);
 	const navigate = useNavigate();
+	const [frames, setFrames] = useState<string[][][]>([]);
+	const [currentFrame, setCurrentFrame] = useState(0);
+	const [loading, setLoading] = useState(true);
+	const [game, setGame] = useState<any>(null);
+
 	useEffect(() => {
-		const fetchAndReplay = async () => {
+		const fetchReplay = async () => {
 			if (!id) return;
 			setLoading(true);
 			try {
-				const data = await getGame(id);
+				const gameData = await getGame(id);
+				const framesData = await getReplay(id);
 
-				const emptyBoard = Array.from({ length: data.board.length }, () => Array.from({ length: data.board[0].length }, () => "_"));
+				setGame(gameData);
+				setFrames(framesData);
 
-				setGame(data);
-				setBoard(emptyBoard);
-
-				await delay(1000);
-				await playReplay(data.moves);
+				animateReplay(framesData.length);
 			} finally {
 				setLoading(false);
 			}
 		};
-
-		fetchAndReplay();
+		fetchReplay();
 	}, [id]);
 
-	const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-	const playReplay = async (moves: { player: string; row: number; side: "L" | "R" }[]) => {
-		for (let move of moves) {
-			await delay(1000);
-			setBoard((prevBoard) => {
-				const updated = JSON.parse(JSON.stringify(prevBoard));
-				applyMoveLocally(updated, move.row, move.side, move.player);
-				return updated;
-			});
-		}
+	const animateReplay = (totalFrames: number) => {
+		let frame = 0;
+		const interval = setInterval(() => {
+			frame++;
+			setCurrentFrame(frame);
+			if (frame >= totalFrames - 1) {
+				clearInterval(interval);
+			}
+		}, 1000);
 	};
 
-	const applyMoveLocally = (board: string[][], row: number, side: "L" | "R", symbol: string) => {
-		if (side === "L") {
-			for (let col = 0; col < board[0].length; col++) {
-				if (board[row][col] === "_") {
-					for (let shift = col; shift > 0; shift--) {
-						board[row][shift] = board[row][shift - 1];
-					}
-					board[row][0] = symbol;
-					break;
-				}
-			}
-		} else {
-			for (let col = board[0].length - 1; col >= 0; col--) {
-				if (board[row][col] === "_") {
-					for (let shift = col; shift < board[0].length - 1; shift++) {
-						board[row][shift] = board[row][shift + 1];
-					}
-					board[row][board[0].length - 1] = symbol;
-					break;
-				}
-			}
-		}
-	};
-
-	if (loading || !game) {
+	if (loading || !frames.length) {
 		return (
 			<Box display="flex" justifyContent="center" alignItems="center" height="100vh">
 				<CircularProgress />
 			</Box>
 		);
 	}
+
+	const board = frames[currentFrame] ?? frames[frames.length - 1];
 
 	return (
 		<Box
@@ -100,10 +74,8 @@ const ReplayPage = () => {
 					alignItems: "center",
 				}}
 			>
-				{/* Board rendering, player names, etc (copy from GamePage but no move buttons) */}
-
 				<Typography variant="h4" sx={{ my: 2 }}>
-					Replay: {game.player_1.nickname} vs {game.player_2.nickname}
+					Replay: {game?.player_1?.nickname} vs {game?.player_2?.nickname}
 				</Typography>
 
 				<Box>
