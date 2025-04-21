@@ -5,6 +5,8 @@ on:
     branches:
       - main # or your default branch
 
+  workflow_dispatch:
+
 permissions:
   contents: write # required for GH Pages deployment
 
