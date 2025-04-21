@@ -16,7 +16,13 @@ const ReplayPage = () => {
 			setLoading(true);
 			try {
 				const data = await getGame(id);
-				setGame(data);
+
+				const emptyBoard = Array.from({ length: data.board.length }, () => Array.from({ length: data.board[0].length }, () => "_"));
+
+				setGame({
+					...data,
+					board: emptyBoard,
+				});
 
 				await delay(1000);
 				await playReplay(data.moves);
@@ -24,6 +30,7 @@ const ReplayPage = () => {
 				setLoading(false);
 			}
 		};
+
 		fetchAndReplay();
 	}, [id]);
 
