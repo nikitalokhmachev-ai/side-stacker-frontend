@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main # or your default branch
+  workflow_dispatch: # 👈 this adds manual trigger capability
 
 permissions:
   contents: write # required for GH Pages deployment
