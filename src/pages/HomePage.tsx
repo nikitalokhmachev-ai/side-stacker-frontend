@@ -14,8 +14,9 @@ import {
 	DialogActions,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { createGame, createPlayer } from "../api/gameApi";
-import { PlayerCreate, PlayerType } from "../types/game";
+import { createGame, createPlayer, getGamesByPlayer, getPlayer } from "../api/gameApi";
+import { PlayerCreate, PlayerType, GameState } from "../types/game";
+import { useEffect } from "react";
 
 const playerOptions = [
 	{ label: "Me", value: "me" },
@@ -31,50 +32,109 @@ const HomePage = () => {
 	const navigate = useNavigate();
 	const [onlineModalOpen, setOnlineModalOpen] = useState(false);
 	const [waitingSocket, setWaitingSocket] = useState<WebSocket | null>(null);
+	const [playerId, setPlayerId] = useState<string | null>(localStorage.getItem("playerId"));
+	const [gameHistory, setGameHistory] = useState<GameState[]>([]);
+
+	// Load existing player
+	useEffect(() => {
+		const storedId = localStorage.getItem("playerId");
+		if (storedId) {
+			getPlayer(storedId).then((player) => {
+				setNickname(player.nickname);
+				setPlayerId(storedId);
+				loadGameHistory(storedId);
+			});
+		}
+	}, []);
+
+	const loadGameHistory = async (id: string) => {
+		const history = await getGamesByPlayer(id);
+		setGameHistory(history.reverse()); // show newest first
+	};
 
 	const handleStartGame = async () => {
-		const player1: PlayerCreate = {
-			nickname: player1Type === "me" ? nickname : "Player 1",
-			type: player1Type === "me" ? "human" : (player1Type as PlayerType),
-		};
+		let localPlayerId = localStorage.getItem("playerId");
+		let p1Id: string;
 
-		const player2: PlayerCreate = {
+		if (player1Type === "me" && localPlayerId) {
+			// Player already exists locally, fetch from DB to get nickname
+			try {
+				const existingPlayer = await getPlayer(localPlayerId);
+				setNickname(existingPlayer.nickname);
+				p1Id = existingPlayer.id;
+			} catch {
+				// If somehow invalid, create fresh
+				const newPlayer: PlayerCreate = { nickname, type: "human" };
+				p1Id = await createPlayer(newPlayer);
+				localStorage.setItem("playerId", p1Id);
+				localStorage.setItem("nickname", newPlayer.nickname);
+				setPlayerId(p1Id);
+			}
+		} else if (player1Type === "me") {
+			// No player stored, create new
+			const newPlayer: PlayerCreate = { nickname, type: "human" };
+			p1Id = await createPlayer(newPlayer);
+			localStorage.setItem("playerId", p1Id);
+			localStorage.setItem("nickname", newPlayer.nickname);
+			setPlayerId(p1Id);
+		} else {
+			// Bot case
+			const botPlayer: PlayerCreate = { nickname: "Player 1", type: player1Type as PlayerType };
+			p1Id = await createPlayer(botPlayer);
+		}
+
+		const p2: PlayerCreate = {
 			nickname: player2Type === "me" ? nickname : "Player 2",
 			type: player2Type === "me" ? "human" : (player2Type as PlayerType),
 		};
 
-		const p1Id = await createPlayer(player1);
-		const p2Id = await createPlayer(player2);
-
+		const p2Id = await createPlayer(p2);
 		const newGame = await createGame(p1Id, p2Id);
-		if (newGame) navigate(`/game/${newGame.id}`, { state: { playerId: p1Id } });
+
+		await loadGameHistory(p1Id);
+		navigate(`/game/${newGame.id}`, { state: { playerId: p1Id } });
 	};
 
 	const handleOnlineGame = async () => {
-		const newPlayer: PlayerCreate = {
-			nickname,
-			type: "human",
-		};
+		let localPlayerId = localStorage.getItem("playerId");
 
-		const playerId = await createPlayer(newPlayer);
+		if (localPlayerId) {
+			try {
+				const existing = await getPlayer(localPlayerId);
+				setNickname(existing.nickname);
+				setPlayerId(existing.id);
+			} catch {
+				localPlayerId = null;
+			}
+		}
+
+		if (!localPlayerId) {
+			const newPlayer: PlayerCreate = { nickname, type: "human" };
+			localPlayerId = await createPlayer(newPlayer);
+			localStorage.setItem("playerId", localPlayerId);
+			localStorage.setItem("nickname", newPlayer.nickname);
+			setPlayerId(localPlayerId);
+		}
 
 		const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/online-game`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ player_id: playerId }),
+			body: JSON.stringify({ player_id: localPlayerId }),
 		});
 
 		const data = await res.json();
 
+		await loadGameHistory(localPlayerId);
+
 		if (data.waiting) {
 			setOnlineModalOpen(true);
 
-			const socket = new WebSocket(`${import.meta.env.VITE_WS_BASE_URL}/waiting/${playerId}`);
+			const socket = new WebSocket(`${import.meta.env.VITE_WS_BASE_URL}/waiting/${localPlayerId}`);
 			socket.onmessage = (event) => {
 				const game = JSON.parse(event.data);
 				socket.close();
 				setOnlineModalOpen(false);
-				navigate(`/game/${game.id}`, { state: { playerId } });
+				navigate(`/game/${game.id}`, { state: { playerId: localPlayerId } });
 			};
 
 			socket.onerror = () => {
@@ -83,7 +143,7 @@ const HomePage = () => {
 
 			setWaitingSocket(socket);
 		} else {
-			navigate(`/game/${data.game.id}`, { state: { playerId } });
+			navigate(`/game/${data.game.id}`, { state: { playerId: localPlayerId } });
 		}
 	};
 
@@ -153,6 +213,39 @@ const HomePage = () => {
 					<Button variant="contained" color="success" onClick={handleOnlineGame}>
 						Online Game
 					</Button>
+
+					{gameHistory.length > 0 && (
+						<Box width="100%" mt={4}>
+							<Typography variant="h5" gutterBottom>
+								Game History
+							</Typography>
+							{gameHistory.map((game) => (
+								<Box
+									key={game.id}
+									display="flex"
+									justifyContent="space-between"
+									alignItems="center"
+									mb={1}
+									sx={{ padding: 1, border: "1px solid #ccc", borderRadius: 2 }}
+								>
+									<Box>
+										<Typography variant="body1">
+											{game.player_1.nickname} (x) vs {game.player_2.nickname} (o)
+										</Typography>
+										<Typography variant="body2" color="text.secondary">
+											Status: {game.status}
+										</Typography>
+									</Box>
+									<Button variant="outlined" onClick={() => navigate(`/game/${game.id}`, { state: { playerId } })}>
+										View
+									</Button>
+									<Button variant="outlined" onClick={() => navigate(`/replay/${game.id}`, { state: { playerId, replay: true } })}>
+										Replay
+									</Button>
+								</Box>
+							))}
+						</Box>
+					)}
 				</Box>
 			</Box>
 			<Dialog open={onlineModalOpen}>

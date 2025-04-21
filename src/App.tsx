@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import GamePage from "./pages/GamePage";
 import HomePage from "./pages/HomePage";
+import ReplayPage from "./pages/ReplayPage";
 import { SnackbarProvider } from "notistack";
 import CssBaseline from "@mui/material/CssBaseline";
 
@@ -11,6 +12,7 @@ const App = () => {
 			<Routes>
 				<Route path="/" element={<HomePage />} />
 				<Route path="/game/:id" element={<GamePage />} />
+				<Route path="/replay/:id" element={<ReplayPage />} />
 				<Route path="*" element={<Navigate to="/" />} />
 			</Routes>
 		</SnackbarProvider>
