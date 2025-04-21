@@ -16,4 +16,5 @@ export interface GameState {
 	status: string;
 	player_1: PlayerInfo;
 	player_2: PlayerInfo;
+	moves: { player: string; row: number; side: "L" | "R" }[];
 }

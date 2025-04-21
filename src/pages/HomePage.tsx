@@ -239,6 +239,9 @@ const HomePage = () => {
 									<Button variant="outlined" onClick={() => navigate(`/game/${game.id}`, { state: { playerId } })}>
 										View
 									</Button>
+									<Button variant="outlined" onClick={() => navigate(`/replay/${game.id}`, { state: { playerId, replay: true } })}>
+										Replay
+									</Button>
 								</Box>
 							))}
 						</Box>
